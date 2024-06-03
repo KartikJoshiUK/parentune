@@ -4,6 +4,7 @@ from models.childModel import Child
 from models.blogModel import Blog, blogs_schema
 from sqlalchemy import and_
 from werkzeug.exceptions import BadRequest
+from helpers.utilities import getFilteredBlogs
 
 feed = Blueprint('feed', __name__)
 
@@ -37,17 +38,5 @@ def custom_home_feed():
     if gender not in [None, 'male', 'female']:
         raise BadRequest('Gender should be male or female')
 
-    filters = []
-
-
-    if age_from is not None:
-        filters.append(Blog.age_from >= age_from)
-        filters.append(Blog.age_to <= age_from)
-    if age_to is not None:
-        filters.append(Blog.age_from <= age_to)
-        filters.append(Blog.age_to >= age_to)
-    if gender is not None:
-        filters.append(Blog.gender == gender)
-
-    blogs = Blog.query.filter(and_(*filters)).all()
+    blogs = getFilteredBlogs(age_from, age_to, gender)
     return blogs_schema.jsonify(blogs)

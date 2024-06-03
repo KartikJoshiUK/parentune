@@ -1,9 +1,24 @@
+from queue import Queue
 from flask import Blueprint, jsonify, request
 from models.blogModel import Blog, blogs_schema, blog_schema
 from services.db import db
 from werkzeug.exceptions import BadRequest
+from helpers.utilities import send_notification
+from concurrent.futures import ThreadPoolExecutor
 
 blog = Blueprint('blog', __name__)
+
+notification_queue = Queue()
+
+def notification_worker(app):
+    print("Worker Thread started for notification")
+    with app.app_context():
+        while True:
+            notification_data = notification_queue.get()
+            if notification_data is None:
+                break  # Stop the thread if None is received
+            send_notification(**notification_data)
+            notification_queue.task_done()
 
 # Create a blog
 @blog.route('/', methods=['POST'])
@@ -27,7 +42,19 @@ def add_blog():
     new_blog = Blog(title=title, content=content, age_from=age_from, age_to=age_to, gender=gender)
     db.session.add(new_blog)
     db.session.commit()
+    new_blog_id = new_blog.id
+
+    # Add notification task to the queue
+    notification_queue.put({
+        'blogs': new_blog,
+        'blogs_id': new_blog_id,
+        'age_from': age_from,
+        'age_to': age_to,
+        'gender': gender
+    })
+
     return blog_schema.jsonify(new_blog)
+
 
 # Read all blogs
 @blog.route('/', methods=['GET'])
